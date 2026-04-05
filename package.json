@@ -1,0 +1,20 @@
+{
+  "name": "flex-stats",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Show off your coding stats in style",
+  "main": "src/index.js",
+  "bin": {
+    "flex": "src/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["git", "stats", "cli", "developer-tools"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^12.1.0"
+  }
+}
