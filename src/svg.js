@@ -21,31 +21,70 @@ export function generateSVG(stats, streakData, repoName, periodLabel, theme = 'd
   const rank = getRank(stats, streakData);
   const level = getLevel(stats.commits);
   const highlights = getHighlights(stats, streakData);
-  const W = 480, H = 430;
+  const W = 480;
+  const F = `font-family="'SF Mono','Fira Code',monospace"`;
 
-  // Language bars
+  // Dynamic Y layout — each section pushes cursor down
+  let y = 0;
+
+  // Header: 0-54
+  y = 54;
+
+  // User + rank + level: 55-116
+  y = 116;
+
+  // Stats grid row 1: values at y+26, y+44
+  const statsY = y + 10;    // 126 — labels
+  const statsValY = statsY + 18; // 144 — values
+
+  // Stats grid row 2
+  const stats2Y = statsValY + 25;    // 169 — labels
+  const stats2ValY = stats2Y + 18;   // 187 — values
+
+  // Highlights
+  y = stats2ValY + 20; // 207
+  const hlY = y;
+
+  // Language section
+  y = hlY + highlights.length * 18 + 14;
+  const langTitleY = y;
+  const langBarY = y + 14;
+  const langLabelY = langBarY + 20;
+
+  // Sparkline section
+  y = langLabelY + 16;
+  const sparkTitleY = y;
+  const sparkBaseY = sparkTitleY + 50;
+
+  // Footer
+  const footerY = sparkBaseY + 20;
+  const H = footerY + 10;
+
+  // Build language bars
   let langBars = '';
   let langLabels = '';
   let xOffset = 30;
   const barW = W - 60;
-  for (const lang of stats.languages.slice(0, 6)) {
+  const langs = stats.languages.slice(0, 6);
+  const langColors = ['#58a6ff', '#3fb950', '#d29922', '#bc8cff', '#f85149', '#79c0ff'];
+  for (let i = 0; i < langs.length; i++) {
+    const lang = langs[i];
     const w = Math.max(2, (lang.pct / 100) * barW);
-    const colors = ['#58a6ff', '#3fb950', '#d29922', '#bc8cff', '#f85149', '#79c0ff'];
-    const color = colors[stats.languages.indexOf(lang) % colors.length];
-    langBars += `<rect x="${xOffset}" y="290" width="${w}" height="8" rx="2" fill="${color}"/>`;
+    langBars += `<rect x="${xOffset}" y="${langBarY}" width="${w}" height="8" rx="2" fill="${langColors[i % langColors.length]}"/>`;
     if (lang.pct >= 8) {
-      langLabels += `<text x="${xOffset + w / 2}" y="316" fill="${c.textDim}" font-size="10" text-anchor="middle" font-family="'SF Mono','Fira Code',monospace">${lang.name} ${lang.pct}%</text>`;
+      langLabels += `<text x="${xOffset + w / 2}" y="${langLabelY}" fill="${c.textDim}" font-size="10" text-anchor="middle" ${F}>${lang.name} ${lang.pct}%</text>`;
     }
     xOffset += w + 2;
   }
 
-  // Hour activity chart (mini sparkline)
-  const maxH = Math.max(...stats.hourCounts, 1);
+  // Build sparkline
+  const maxHour = Math.max(...stats.hourCounts, 1);
   let sparkline = '';
+  const sparkH = 40;
   for (let i = 0; i < 24; i++) {
-    const h = (stats.hourCounts[i] / maxH) * 40;
+    const h = (stats.hourCounts[i] / maxHour) * sparkH;
     const x = 30 + i * ((W - 60) / 24);
-    sparkline += `<rect x="${x}" y="${340 - h}" width="${(W - 60) / 24 - 1}" height="${h}" rx="1" fill="${c.accent}" opacity="0.6"/>`;
+    sparkline += `<rect x="${x}" y="${sparkBaseY - h}" width="${(W - 60) / 24 - 1}" height="${h}" rx="1" fill="${c.accent}" opacity="0.6"/>`;
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -67,72 +106,66 @@ export function generateSVG(stats, streakData, repoName, periodLabel, theme = 'd
   <!-- Background -->
   <rect width="${W}" height="${H}" rx="12" fill="url(#bg)" stroke="${c.border}" stroke-width="1"/>
 
-  <!-- Header line -->
+  <!-- Header -->
   <rect x="0" y="54" width="${W}" height="1" fill="${c.border}"/>
-
-  <!-- Title -->
-  <text x="30" y="36" fill="${c.accent}" font-size="16" font-weight="bold" font-family="'SF Mono','Fira Code',monospace" filter="url(#glow)">FLEX</text>
-  <text x="78" y="36" fill="${c.textDim}" font-size="13" font-family="'SF Mono','Fira Code',monospace">${escXml(repoName)} \u2022 ${escXml(periodLabel)}</text>
+  <text x="30" y="36" fill="${c.accent}" font-size="16" font-weight="bold" ${F} filter="url(#glow)">FLEX</text>
+  <text x="78" y="36" fill="${c.textDim}" font-size="13" ${F}>${escXml(repoName)} \u2022 ${escXml(periodLabel)}</text>
 
   <!-- User + Rank -->
-  <text x="30" y="82" fill="${c.yellow}" font-size="15" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${escXml(stats.author)}</text>
-  <text x="${30 + stats.author.length * 9.5}" y="82" fill="${c.purple}" font-size="13" font-style="italic" font-family="'SF Mono','Fira Code',monospace">  ${rank.icon} ${escXml(rank.title)}</text>
+  <text x="30" y="82" fill="${c.yellow}" font-size="15" font-weight="bold" ${F}>${escXml(stats.author)}</text>
+  <text x="${30 + stats.author.length * 9.5}" y="82" fill="${c.purple}" font-size="13" font-style="italic" ${F}>  ${rank.icon} ${escXml(rank.title)}</text>
 
   <!-- Level bar -->
-  <text x="30" y="105" fill="${c.textDim}" font-size="11" font-family="'SF Mono','Fira Code',monospace">LVL ${level.level} \u2022 ${escXml(level.name)}</text>
+  <text x="30" y="105" fill="${c.textDim}" font-size="11" ${F}>LVL ${level.level} \u2022 ${escXml(level.name)}</text>
   <rect x="160" y="96" width="120" height="8" rx="4" fill="${c.border}"/>
   <rect x="160" y="96" width="${level.level * 12}" height="8" rx="4" fill="url(#accent)"/>
 
   <!-- Separator -->
   <rect x="30" y="116" width="${W - 60}" height="1" fill="${c.border}"/>
 
-  <!-- Stats grid -->
-  <text x="30" y="142" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">COMMITS</text>
-  <text x="30" y="160" fill="${c.text}" font-size="18" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${formatNumber(stats.commits)}</text>
+  <!-- Stats row 1 -->
+  <text x="30" y="${statsY}" fill="${c.textDim}" font-size="10" ${F}>COMMITS</text>
+  <text x="30" y="${statsValY}" fill="${c.text}" font-size="18" font-weight="bold" ${F}>${formatNumber(stats.commits)}</text>
 
-  <text x="140" y="142" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">ADDED</text>
-  <text x="140" y="160" fill="${c.green}" font-size="18" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">+${formatNumber(stats.added)}</text>
+  <text x="140" y="${statsY}" fill="${c.textDim}" font-size="10" ${F}>ADDED</text>
+  <text x="140" y="${statsValY}" fill="${c.green}" font-size="18" font-weight="bold" ${F}>+${formatNumber(stats.added)}</text>
 
-  <text x="250" y="142" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">REMOVED</text>
-  <text x="250" y="160" fill="${c.red}" font-size="18" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">-${formatNumber(stats.removed)}</text>
+  <text x="250" y="${statsY}" fill="${c.textDim}" font-size="10" ${F}>REMOVED</text>
+  <text x="250" y="${statsValY}" fill="${c.red}" font-size="18" font-weight="bold" ${F}>-${formatNumber(stats.removed)}</text>
 
-  <text x="370" y="142" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">FILES</text>
-  <text x="370" y="160" fill="${c.text}" font-size="18" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${formatNumber(stats.filesCount)}</text>
+  <text x="370" y="${statsY}" fill="${c.textDim}" font-size="10" ${F}>FILES</text>
+  <text x="370" y="${statsValY}" fill="${c.text}" font-size="18" font-weight="bold" ${F}>${formatNumber(stats.filesCount)}</text>
 
-  <!-- Row 2 -->
-  <text x="30" y="195" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">PEAK HOUR</text>
-  <text x="30" y="213" fill="${c.text}" font-size="14" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${formatHour(stats.peakHour)}</text>
+  <!-- Stats row 2 -->
+  <text x="30" y="${stats2Y}" fill="${c.textDim}" font-size="10" ${F}>PEAK HOUR</text>
+  <text x="30" y="${stats2ValY}" fill="${c.text}" font-size="14" font-weight="bold" ${F}>${formatHour(stats.peakHour)}</text>
 
-  <text x="140" y="195" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">STREAK</text>
-  <text x="140" y="213" fill="${c.yellow}" font-size="14" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${streakData.current}d \u{1F525}</text>
+  <text x="140" y="${stats2Y}" fill="${c.textDim}" font-size="10" ${F}>STREAK</text>
+  <text x="140" y="${stats2ValY}" fill="${c.yellow}" font-size="14" font-weight="bold" ${F}>${streakData.current}d \u{1F525}</text>
 
-  <text x="250" y="195" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">BEST STREAK</text>
-  <text x="250" y="213" fill="${c.text}" font-size="14" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${streakData.longest}d</text>
+  <text x="250" y="${stats2Y}" fill="${c.textDim}" font-size="10" ${F}>TOP STREAK</text>
+  <text x="250" y="${stats2ValY}" fill="${c.text}" font-size="14" font-weight="bold" ${F}>${streakData.longest}d</text>
 
-  <text x="370" y="195" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">NET LINES</text>
-  <text x="370" y="213" fill="${stats.net >= 0 ? c.green : c.red}" font-size="14" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${stats.net >= 0 ? '+' : ''}${formatNumber(stats.net)}</text>
+  <text x="370" y="${stats2Y}" fill="${c.textDim}" font-size="10" ${F}>NET LINES</text>
+  <text x="370" y="${stats2ValY}" fill="${stats.net >= 0 ? c.green : c.red}" font-size="14" font-weight="bold" ${F}>${stats.net >= 0 ? '+' : ''}${formatNumber(stats.net)}</text>
 
   <!-- Highlights -->
-  ${highlights.map((h, i) => `<text x="30" y="${250 + i * 18}" fill="${c.yellow}" font-size="11" font-style="italic" font-family="'SF Mono','Fira Code',monospace">&gt; ${escXml(h)}</text>`).join('\n  ')}
+  ${highlights.map((h, i) => `<text x="30" y="${hlY + i * 18}" fill="${c.yellow}" font-size="11" font-style="italic" ${F}>&gt; ${escXml(h)}</text>`).join('\n  ')}
 
-  <!-- Language bars -->
+  <!-- Languages -->
+  <text x="30" y="${langTitleY}" fill="${c.textDim}" font-size="10" ${F}>LANGUAGES</text>
   ${langBars}
   ${langLabels}
 
   <!-- Activity sparkline -->
-  <text x="30" y="340" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">ACTIVITY BY HOUR</text>
+  <text x="30" y="${sparkTitleY}" fill="${c.textDim}" font-size="10" ${F}>ACTIVITY BY HOUR</text>
   ${sparkline}
 
   <!-- Footer -->
-  <text x="${W - 30}" y="${H - 12}" fill="${c.textDim}" font-size="9" text-anchor="end" font-family="'SF Mono','Fira Code',monospace">generated by flex</text>
+  <text x="${W - 30}" y="${footerY}" fill="${c.textDim}" font-size="9" text-anchor="end" ${F}>generated by git-flex</text>
 </svg>`;
 }
 
 function escXml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function truncPath(p, max) {
-  if (p.length <= max) return p;
-  return '...' + p.slice(-(max - 3));
 }
