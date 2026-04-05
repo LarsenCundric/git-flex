@@ -1,11 +1,25 @@
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
+
+const STDIO = { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] };
 
 function run(cmd) {
   try {
-    return execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }).trim();
+    return execSync(cmd, STDIO).trim();
   } catch {
     return '';
   }
+}
+
+function runArgs(args) {
+  try {
+    return execFileSync(args[0], args.slice(1), STDIO).trim();
+  } catch {
+    return '';
+  }
+}
+
+function getEmptyTreeHash() {
+  return run('git hash-object -t tree /dev/null') || '4b825dc642cb6eb9a060e54bf899d69f82cf17c8';
 }
 
 export function isGitRepo() {
@@ -27,11 +41,11 @@ export function getCurrentUser() {
 }
 
 export function getCommits({ author, since, until } = {}) {
-  const parts = ['git', 'log', '--no-merges', '--format=%H|%an|%ae|%aI|%s'];
-  if (author) parts.push(`--author=${author}`);
-  if (since) parts.push(`--since="${since}"`);
-  if (until) parts.push(`--until="${until}"`);
-  const raw = run(parts.join(' '));
+  const args = ['git', 'log', '--no-merges', '--format=%H|%an|%ae|%aI|%s'];
+  if (author) args.push(`--author=${author}`);
+  if (since) args.push(`--since=${since}`);
+  if (until) args.push(`--until=${until}`);
+  const raw = runArgs(args);
   if (!raw) return [];
   return raw.split('\n').filter(Boolean).map(line => {
     const [hash, name, email, date, ...msgParts] = line.split('|');
@@ -41,29 +55,33 @@ export function getCommits({ author, since, until } = {}) {
 
 export function getDiffStats(commits) {
   if (!commits.length) return { added: 0, removed: 0, files: new Set(), fileChanges: {} };
-  const hashes = commits.map(c => c.hash);
   let added = 0, removed = 0;
   const files = new Set();
   const fileChanges = {};
 
-  // Process in batches to avoid arg limits
-  const batchSize = 50;
-  for (let i = 0; i < hashes.length; i += batchSize) {
-    const batch = hashes.slice(i, i + batchSize);
-    const cmd = `git diff --shortstat ${batch.length === 1 ? `${batch[0]}~1 ${batch[0]}` : ''} 2>/dev/null || true`;
-
-    // Use numstat for detailed per-file stats
-    for (const hash of batch) {
-      const numstat = run(`git diff --numstat ${hash}~1 ${hash} 2>/dev/null`);
-      if (!numstat) continue;
-      for (const line of numstat.split('\n').filter(Boolean)) {
+  for (const { hash } of commits) {
+    const numstat = runArgs(['git', 'diff', '--numstat', `${hash}~1`, hash]);
+    if (!numstat) {
+      // First commit — diff against empty tree
+      const numstat2 = runArgs(['git', 'diff', '--numstat', getEmptyTreeHash(), hash]);
+      if (!numstat2) continue;
+      for (const line of numstat2.split('\n').filter(Boolean)) {
         const [a, r, file] = line.split('\t');
-        if (a === '-') continue; // binary
+        if (a === '-') continue;
         added += parseInt(a) || 0;
         removed += parseInt(r) || 0;
         files.add(file);
         fileChanges[file] = (fileChanges[file] || 0) + (parseInt(a) || 0) + (parseInt(r) || 0);
       }
+      continue;
+    }
+    for (const line of numstat.split('\n').filter(Boolean)) {
+      const [a, r, file] = line.split('\t');
+      if (a === '-') continue;
+      added += parseInt(a) || 0;
+      removed += parseInt(r) || 0;
+      files.add(file);
+      fileChanges[file] = (fileChanges[file] || 0) + (parseInt(a) || 0) + (parseInt(r) || 0);
     }
   }
 
@@ -73,12 +91,14 @@ export function getDiffStats(commits) {
 export function getLanguageBreakdown(commits) {
   if (!commits.length) return {};
   const extCount = {};
-  const hashes = commits.map(c => c.hash);
 
-  for (const hash of hashes) {
-    const files = run(`git diff --name-only ${hash}~1 ${hash} 2>/dev/null`);
-    if (!files) continue;
-    for (const file of files.split('\n').filter(Boolean)) {
+  for (const { hash } of commits) {
+    let filesRaw = runArgs(['git', 'diff', '--name-only', `${hash}~1`, hash]);
+    if (!filesRaw) {
+      filesRaw = runArgs(['git', 'diff', '--name-only', getEmptyTreeHash(), hash]);
+    }
+    if (!filesRaw) continue;
+    for (const file of filesRaw.split('\n').filter(Boolean)) {
       const ext = file.includes('.') ? file.split('.').pop().toLowerCase() : 'other';
       extCount[ext] = (extCount[ext] || 0) + 1;
     }
@@ -88,10 +108,10 @@ export function getLanguageBreakdown(commits) {
 }
 
 export function getAllAuthors({ since, until } = {}) {
-  const parts = ['git', 'log', '--no-merges', '--format=%an'];
-  if (since) parts.push(`--since="${since}"`);
-  if (until) parts.push(`--until="${until}"`);
-  const raw = run(parts.join(' '));
+  const args = ['git', 'log', '--no-merges', '--format=%an'];
+  if (since) args.push(`--since=${since}`);
+  if (until) args.push(`--until=${until}`);
+  const raw = runArgs(args);
   if (!raw) return [];
   const counts = {};
   for (const name of raw.split('\n').filter(Boolean)) {
@@ -103,7 +123,7 @@ export function getAllAuthors({ since, until } = {}) {
 }
 
 export function getStreakData(author) {
-  const raw = run(`git log --no-merges --author="${author}" --format=%aI`);
+  const raw = runArgs(['git', 'log', '--no-merges', `--author=${author}`, '--format=%aI']);
   if (!raw) return { current: 0, longest: 0 };
 
   const dates = [...new Set(
