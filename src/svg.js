@@ -1,5 +1,6 @@
 import { formatHour, formatNumber } from './stats.js';
 import { getRank, getLevel } from './rank.js';
+import { getHighlights } from './highlights.js';
 
 const DARK = {
   bg1: '#0d1117', bg2: '#161b22', border: '#30363d',
@@ -19,7 +20,8 @@ export function generateSVG(stats, streakData, repoName, periodLabel, theme = 'd
   const c = theme === 'light' ? LIGHT : DARK;
   const rank = getRank(stats, streakData);
   const level = getLevel(stats.commits);
-  const W = 480, H = 400;
+  const highlights = getHighlights(stats, streakData);
+  const W = 480, H = 430;
 
   // Language bars
   let langBars = '';
@@ -110,11 +112,8 @@ export function generateSVG(stats, streakData, repoName, periodLabel, theme = 'd
   <text x="370" y="195" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">NET LINES</text>
   <text x="370" y="213" fill="${stats.net >= 0 ? c.green : c.red}" font-size="14" font-weight="bold" font-family="'SF Mono','Fira Code',monospace">${stats.net >= 0 ? '+' : ''}${formatNumber(stats.net)}</text>
 
-  <!-- Most edited -->
-  ${stats.mostEdited ? `
-  <text x="30" y="248" fill="${c.textDim}" font-size="10" font-family="'SF Mono','Fira Code',monospace">MOST EDITED</text>
-  <text x="30" y="265" fill="${c.text}" font-size="11" font-family="'SF Mono','Fira Code',monospace">${escXml(truncPath(stats.mostEdited.file, 50))} (${stats.mostEdited.changes})</text>
-  ` : ''}
+  <!-- Highlights -->
+  ${highlights.map((h, i) => `<text x="30" y="${250 + i * 18}" fill="${c.yellow}" font-size="11" font-style="italic" font-family="'SF Mono','Fira Code',monospace">&gt; ${escXml(h)}</text>`).join('\n  ')}
 
   <!-- Language bars -->
   ${langBars}

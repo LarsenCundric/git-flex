@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { formatHour, formatNumber } from './stats.js';
 import { getRank, getLevel } from './rank.js';
+import { getHighlights } from './highlights.js';
 
 const BOX = { tl: '\u256D', tr: '\u256E', bl: '\u2570', br: '\u256F', h: '\u2500', v: '\u2502' };
 const W = 56;
@@ -66,7 +67,7 @@ export function renderCard(stats, streakData, repoName, periodLabel) {
     [chalk.dim('Files'), chalk.bold.white(formatNumber(stats.filesCount))],
     [chalk.dim('Peak Hour'), chalk.bold.white(formatHour(stats.peakHour))],
     [chalk.dim('Streak'), chalk.bold.yellow(`${streakData.current}d \u{1F525}`)],
-    [chalk.dim('Best'), chalk.bold.white(`${streakData.longest}d`)],
+    [chalk.dim('Top Streak'), chalk.bold.white(`${streakData.longest}d`)],
   ];
 
   for (let i = 0; i < col1.length; i++) {
@@ -88,13 +89,13 @@ export function renderCard(stats, streakData, repoName, periodLabel) {
     }
   }
 
-  // Most edited
-  if (stats.mostEdited) {
+  // Highlights
+  const highlights = getHighlights(stats, streakData);
+  if (highlights.length) {
     o.push(hr());
-    const fname = stats.mostEdited.file.length > 38
-      ? '...' + stats.mostEdited.file.slice(-35)
-      : stats.mostEdited.file;
-    o.push(line(chalk.cyan(BOX.v), ` ${chalk.dim('Most Edited')} ${chalk.white(fname)}`, chalk.cyan(BOX.v)));
+    for (const h of highlights) {
+      o.push(line(chalk.cyan(BOX.v), ` ${chalk.yellow('>')} ${chalk.italic.white(h)}`, chalk.cyan(BOX.v)));
+    }
   }
 
   // Bottom
@@ -150,7 +151,7 @@ export function renderTeam(authors, repoName, periodLabel) {
     const bar = chalk.green('\u2588'.repeat(Math.max(1, Math.round((a.commits / maxCommits) * 15))));
     const name = padRight(chalk.white(a.name), 20);
     o.push(line(chalk.cyan(BOX.v),
-      ` ${padRight(typeof medal === 'string' ? medal : medal, 4)} ${name} ${bar} ${chalk.dim(a.commits)}`,
+      ` ${padRight(medal, 4)} ${name} ${bar} ${chalk.dim(a.commits)}`,
       chalk.cyan(BOX.v)));
   }
 

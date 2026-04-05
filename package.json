@@ -1,8 +1,8 @@
 {
-  "name": "flex-stats",
+  "name": "git-flex",
   "version": "1.0.0",
   "type": "module",
-  "description": "Show off your coding stats in style",
+  "description": "Show off your coding stats in style. Beautiful terminal cards, shareable SVGs, and fun highlights from your git history.",
   "main": "src/index.js",
   "bin": {
     "flex": "src/index.js"
@@ -10,11 +10,37 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["git", "stats", "cli", "developer-tools"],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "git",
+    "stats",
+    "cli",
+    "developer-tools",
+    "coding-stats",
+    "git-stats",
+    "terminal",
+    "svg",
+    "streak",
+    "contributions",
+    "github"
+  ],
+  "author": "LarsenCundric",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LarsenCundric/git-flex.git"
+  },
+  "homepage": "https://github.com/LarsenCundric/git-flex",
+  "bugs": {
+    "url": "https://github.com/LarsenCundric/git-flex/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/"
+  ],
   "dependencies": {
-    "chalk": "^5.6.2",
-    "commander": "^12.1.0"
+    "chalk": "5.6.2",
+    "commander": "12.1.0"
   }
 }

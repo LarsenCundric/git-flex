@@ -1,4 +1,4 @@
-import { getCommits, getDiffStats, getLanguageBreakdown, getCurrentUser } from './git.js';
+import { getCommits, getDiffStatsAndLangs, getCurrentUser } from './git.js';
 
 const EXT_NAMES = {
   js: 'JavaScript', ts: 'TypeScript', jsx: 'React JSX', tsx: 'React TSX',
@@ -16,24 +16,32 @@ const EXT_NAMES = {
 export function computeStats({ author, since, until } = {}) {
   const user = author || getCurrentUser();
   const commits = getCommits({ author: user, since, until });
-  const { added, removed, files, fileChanges } = getDiffStats(commits);
-  const langRaw = getLanguageBreakdown(commits);
 
-  // Language percentages
-  const totalFiles = Object.values(langRaw).reduce((a, b) => a + b, 0) || 1;
-  const languages = Object.entries(langRaw)
-    .map(([ext, count]) => ({
-      ext,
-      name: EXT_NAMES[ext] || ext.toUpperCase(),
+  // Single git command for all diff stats + language breakdown
+  const { added, removed, files, fileChanges, extCount } = getDiffStatsAndLangs({ author: user, since, until });
+
+  // Language percentages (merge extensions that map to the same language name)
+  const totalFiles = Object.values(extCount).reduce((a, b) => a + b, 0) || 1;
+  const langMerged = {};
+  for (const [ext, count] of Object.entries(extCount)) {
+    const name = EXT_NAMES[ext] || ext.toUpperCase();
+    langMerged[name] = (langMerged[name] || 0) + count;
+  }
+  const languages = Object.entries(langMerged)
+    .map(([name, count]) => ({
+      name,
       count,
       pct: Math.round((count / totalFiles) * 100),
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  // Most edited file
+  // Most edited file (skip lockfiles and generated junk)
+  const IGNORE = /(\block\b|\.lock$|\.min\.|\.map$|\.snap$|\.d\.ts$|package-lock|yarn\.lock|pnpm-lock|uv\.lock|Cargo\.lock|Gemfile\.lock|poetry\.lock|composer\.lock|go\.sum|shrinkwrap|dist\/|build\/|\.generated\.|__pycache__|\.svg$|\.ico$|migrations\/|openapi\.|swagger\.|\.proto$|\.pb\.|schema\.prisma)/i;
   const mostEdited = Object.entries(fileChanges)
-    .sort((a, b) => b[1] - a[1])[0];
+    .filter(([f]) => !IGNORE.test(f))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
 
   // Peak coding hour
   const hourCounts = new Array(24).fill(0);
@@ -51,7 +59,7 @@ export function computeStats({ author, since, until } = {}) {
     net: added - removed,
     filesCount: files.size,
     languages,
-    mostEdited: mostEdited ? { file: mostEdited[0], changes: mostEdited[1] } : null,
+    mostEdited: mostEdited.length ? mostEdited.map(([file, changes]) => ({ file, changes })) : null,
     peakHour,
     hourCounts,
     commitData: commits,

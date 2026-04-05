@@ -1,6 +1,6 @@
 import { execSync, execFileSync } from 'node:child_process';
 
-const STDIO = { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] };
+const STDIO = { encoding: 'utf-8', maxBuffer: 100 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] };
 
 function run(cmd) {
   try {
@@ -16,10 +16,6 @@ function runArgs(args) {
   } catch {
     return '';
   }
-}
-
-function getEmptyTreeHash() {
-  return run('git hash-object -t tree /dev/null') || '4b825dc642cb6eb9a060e54bf899d69f82cf17c8';
 }
 
 export function isGitRepo() {
@@ -53,58 +49,40 @@ export function getCommits({ author, since, until } = {}) {
   });
 }
 
-export function getDiffStats(commits) {
-  if (!commits.length) return { added: 0, removed: 0, files: new Set(), fileChanges: {} };
+// Single git command to get all diff stats + file names + language info
+export function getDiffStatsAndLangs({ author, since, until } = {}) {
+  const args = ['git', 'log', '--no-merges', '--numstat', '--format='];
+  if (author) args.push(`--author=${author}`);
+  if (since) args.push(`--since=${since}`);
+  if (until) args.push(`--until=${until}`);
+
+  const raw = runArgs(args);
+
   let added = 0, removed = 0;
   const files = new Set();
   const fileChanges = {};
-
-  for (const { hash } of commits) {
-    const numstat = runArgs(['git', 'diff', '--numstat', `${hash}~1`, hash]);
-    if (!numstat) {
-      // First commit — diff against empty tree
-      const numstat2 = runArgs(['git', 'diff', '--numstat', getEmptyTreeHash(), hash]);
-      if (!numstat2) continue;
-      for (const line of numstat2.split('\n').filter(Boolean)) {
-        const [a, r, file] = line.split('\t');
-        if (a === '-') continue;
-        added += parseInt(a) || 0;
-        removed += parseInt(r) || 0;
-        files.add(file);
-        fileChanges[file] = (fileChanges[file] || 0) + (parseInt(a) || 0) + (parseInt(r) || 0);
-      }
-      continue;
-    }
-    for (const line of numstat.split('\n').filter(Boolean)) {
-      const [a, r, file] = line.split('\t');
-      if (a === '-') continue;
-      added += parseInt(a) || 0;
-      removed += parseInt(r) || 0;
-      files.add(file);
-      fileChanges[file] = (fileChanges[file] || 0) + (parseInt(a) || 0) + (parseInt(r) || 0);
-    }
-  }
-
-  return { added, removed, files, fileChanges };
-}
-
-export function getLanguageBreakdown(commits) {
-  if (!commits.length) return {};
   const extCount = {};
 
-  for (const { hash } of commits) {
-    let filesRaw = runArgs(['git', 'diff', '--name-only', `${hash}~1`, hash]);
-    if (!filesRaw) {
-      filesRaw = runArgs(['git', 'diff', '--name-only', getEmptyTreeHash(), hash]);
-    }
-    if (!filesRaw) continue;
-    for (const file of filesRaw.split('\n').filter(Boolean)) {
+  if (raw) {
+    for (const line of raw.split('\n')) {
+      if (!line || !line.includes('\t')) continue;
+      const parts = line.split('\t');
+      if (parts.length < 3) continue;
+      const [a, r, file] = parts;
+      if (a === '-') continue; // binary
+      const addNum = parseInt(a) || 0;
+      const remNum = parseInt(r) || 0;
+      added += addNum;
+      removed += remNum;
+      files.add(file);
+      fileChanges[file] = (fileChanges[file] || 0) + addNum + remNum;
+
       const ext = file.includes('.') ? file.split('.').pop().toLowerCase() : 'other';
       extCount[ext] = (extCount[ext] || 0) + 1;
     }
   }
 
-  return extCount;
+  return { added, removed, files, fileChanges, extCount };
 }
 
 export function getAllAuthors({ since, until } = {}) {
