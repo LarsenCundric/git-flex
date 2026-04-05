@@ -86,17 +86,31 @@ export function getDiffStatsAndLangs({ author, since, until } = {}) {
 }
 
 export function getAllAuthors({ since, until } = {}) {
-  const args = ['git', 'log', '--no-merges', '--format=%an'];
+  // Get commits + lines in one pass using a marker to separate commits
+  const args = ['git', 'log', '--no-merges', '--numstat', '--format=COMMIT:%an'];
   if (since) args.push(`--since=${since}`);
   if (until) args.push(`--until=${until}`);
   const raw = runArgs(args);
   if (!raw) return [];
-  const counts = {};
-  for (const name of raw.split('\n').filter(Boolean)) {
-    counts[name] = (counts[name] || 0) + 1;
+
+  const authors = {};
+  let current = null;
+
+  for (const ln of raw.split('\n')) {
+    if (ln.startsWith('COMMIT:')) {
+      current = ln.slice(7);
+      if (!authors[current]) authors[current] = { commits: 0, added: 0, removed: 0 };
+      authors[current].commits++;
+    } else if (current && ln.includes('\t')) {
+      const [a, r] = ln.split('\t');
+      if (a === '-') continue;
+      authors[current].added += parseInt(a) || 0;
+      authors[current].removed += parseInt(r) || 0;
+    }
   }
-  return Object.entries(counts)
-    .map(([name, commits]) => ({ name, commits }))
+
+  return Object.entries(authors)
+    .map(([name, s]) => ({ name, commits: s.commits, added: s.added, removed: s.removed, net: s.added - s.removed }))
     .sort((a, b) => b.commits - a.commits);
 }
 
