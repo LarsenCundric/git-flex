@@ -63,19 +63,20 @@ program
   .command('card')
   .description('Generate a shareable SVG card')
   .option('--dark', 'Dark theme (default)')
+  .option('--midnight', 'Midnight theme')
   .option('--light', 'Light theme')
   .option('-p, --period <period>', 'today, week, month, all', 'all')
   .option('-o, --output <file>', 'Output file', 'flex-card.svg')
   .action((opts) => {
     ensureRepo();
-    const theme = opts.light ? 'light' : 'dark';
+    const theme = opts.midnight ? 'midnight' : opts.light ? 'light' : 'dark';
     const { since, label } = getTimeRange(opts.period);
     const repoName = getRepoName();
     const stats = computeStats({ since });
     const streakData = getStreakData(getCurrentUser());
     const svg = generateSVG(stats, streakData, repoName, label, theme);
     writeFileSync(opts.output, svg);
-    console.log(`\u2728 Card saved to ${opts.output} (${theme} theme)`);
+    console.log(`✨ Card saved to ${opts.output} (${theme} theme)`);
   });
 
 program
