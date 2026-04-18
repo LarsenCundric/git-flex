@@ -9,6 +9,13 @@ const DARK = {
   purple: '#bc8cff', grad1: '#0d1117', grad2: '#161b22',
 };
 
+const MIDNIGHT = {
+  bg1: '#09090b', bg2: '#18181b', border: '#27272a',
+  text: '#f4f4f5', textDim: '#71717a', accent: '#10b981',
+  green: '#22c55e', red: '#ef4444', yellow: '#eab308',
+  purple: '#a855f7', grad1: '#09090b', grad2: '#18181b',
+};
+
 const LIGHT = {
   bg1: '#ffffff', bg2: '#f6f8fa', border: '#d0d7de',
   text: '#1f2328', textDim: '#656d76', accent: '#0969da',
@@ -17,7 +24,7 @@ const LIGHT = {
 };
 
 export function generateSVG(stats, streakData, repoName, periodLabel, theme = 'dark') {
-  const c = theme === 'light' ? LIGHT : DARK;
+  const c = theme === 'light' ? LIGHT : theme === 'midnight' ? MIDNIGHT : DARK;
   const rank = getRank(stats, streakData);
   const level = getLevel(stats.commits);
   const highlights = getHighlights(stats, streakData);
